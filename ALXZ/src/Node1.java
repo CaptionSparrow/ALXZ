@@ -4,6 +4,7 @@ import java.io.*;
 
 public class Node1 {
 	private boolean recordTrigger;
+	private boolean playerTrigger;
 	protected ByteArrayOutputStream bOut;
 	protected ByteArrayInputStream bIn;
 	
@@ -108,6 +109,55 @@ public class Node1 {
 			System.exit(-4);
 		}
 	}
+
+	private void playFile(String path) throws UnsupportedAudioFileException, IOException {
+		try {
+			File file = new File(path);
+			final AudioInputStream preSound = AudioSystem.getAudioInputStream(file);
+			final AudioFormat format = preSound.getFormat();
+			DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
+			final SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info);
+			line.open(format);
+			line.start(); // Output audio to sounder
+			
+			/* Establish a thread method for playing audio */
+			Runnable sounder = new Runnable() {
+				int size = (int)format.getSampleRate() * format.getFrameSize();
+				byte buffer[] = new byte[size];
+				
+				public void run() {
+					playerTrigger = true;
+					try {
+						// Read bytes from input stream to buffer
+						int nBytes = preSound.read(buffer, 0, buffer.length);
+						while (nBytes != -1 && playerTrigger) {
+							if (nBytes > 0) {
+								// Write bytes from buffer to line
+								line.write(buffer, 0, nBytes);
+							}
+							// Read bytes from input stream to buffer
+							nBytes = preSound.read(buffer, 0, buffer.length);
+						}
+						// Close the line after the playing is end
+						line.drain();
+						line.close();
+					}
+					catch (IOException e) {
+						System.err.println("IO exception when playing");
+						System.exit(-5);
+					}
+				}
+			};
+			
+			/* Construct a thread for playing audio */
+			Thread soundThread = new Thread(sounder);
+		    soundThread.start();
+		}
+		catch (LineUnavailableException e) {
+			System.err.println("Line not available when playing");
+			System.exit(-6);
+		}
+	}
 	
 	public void record(int time) throws InterruptedException {
 		System.out.println("Now recording");
@@ -118,7 +168,18 @@ public class Node1 {
 	}
 	
 	public void play() {
-		System.out.println("Now playing");
+		System.out.println("Now playing the record audio");
 		playAudio();
+	}
+	
+	public void recordPreSound(String path, int time) throws UnsupportedAudioFileException, IOException, InterruptedException {
+		System.out.println("Playing the predefined sound");
+		playFile(path);
+		System.out.println("Recording the predefined sound");
+		recordAudio();
+		TimeUnit.SECONDS.sleep(time);
+		playerTrigger = false;
+		recordTrigger = false;
+		System.out.println("End recording");
 	}
 }
