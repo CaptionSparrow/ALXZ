@@ -1,16 +1,18 @@
 import javax.sound.sampled.*;
 import java.util.concurrent.*;
 import java.io.*;
+import java.nio.*;
 
 public class Node1 {
 	private boolean recordTrigger;
 	private boolean playerTrigger;
+	private boolean generateTrigger;
 	protected ByteArrayOutputStream bOut;
 	protected ByteArrayInputStream bIn;
 	
 	private AudioFormat getAudioFormat() {
 		float fs = 44100; // Sample Rate
-	    int sampleSize = 8; // Sample size in bits
+	    int sampleSize = 16; // Sample size in bits
 	    int channels = 1;
 	    boolean signed = true;
 	    boolean bigEndian = true;
@@ -159,6 +161,60 @@ public class Node1 {
 		}
 	}
 	
+	private void playSine(double fReq1, double fReq2) {
+		try {
+			final AudioFormat format = getAudioFormat();
+			DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
+			final SourceDataLine line = (SourceDataLine) AudioSystem.getLine(info);
+			line.open(format);
+			line.start(); // Output audio to sounder
+			
+			/* Establish a thread method for playing audio */
+			Runnable playsine = new Runnable() {
+				ByteBuffer buf = ByteBuffer.allocate(line.getBufferSize());
+				
+				public void run() {
+					generateTrigger = true;
+					double fStep1 = fReq1 / 44100;
+					double fStep2 = fReq2 / 44100;
+					double fPosition1 = 0;
+					double fPosition2 = 0;
+					while (generateTrigger) {
+				         buf.clear();
+				         int ctSamples = line.available() / 2;   
+				         for (int i=0; i < ctSamples; i++) {
+				            buf.putShort((short)(Short.MAX_VALUE * Math.sin(2*Math.PI *fPosition1)+Short.MAX_VALUE * Math.sin(2*Math.PI *fPosition2)));
+				            fPosition1 += fStep1;
+				            fPosition2 += fStep2;
+				         }
+
+				         line.write(buf.array(), 0, buf.position());             
+
+				         //Wait until the buffer is at least half empty  before we add more
+				         while (line.getBufferSize()/2 < line.available())
+							try {
+								Thread.sleep(1);
+							} catch (InterruptedException e) {
+								System.err.println("Interrupt exception when playing");
+								System.exit(-7);
+							}                                             
+				      }
+
+				      line.drain();                                         
+				      line.close();
+				}
+			};
+			
+			/* Construct a thread for playing audio */
+			Thread sineThread = new Thread(playsine);
+		    sineThread.start();
+		}
+		catch (LineUnavailableException e) {
+			System.err.println("Line not available when playing");
+			System.exit(-8);
+		}
+	}
+	
 	public void record(int time) throws InterruptedException {
 		System.out.println("Now recording");
 		recordAudio();
@@ -167,8 +223,9 @@ public class Node1 {
 		System.out.println("End recording");
 	}
 	
-	public void play() {
+	public void play() throws InterruptedException {
 		System.out.println("Now playing the record audio");
+		TimeUnit.SECONDS.sleep(1);
 		playAudio();
 	}
 	
@@ -181,5 +238,13 @@ public class Node1 {
 		playerTrigger = false;
 		recordTrigger = false;
 		System.out.println("End recording");
+	}
+	
+	public void playFunction(double fReq1, double fReq2, int time) throws InterruptedException {
+		System.out.println("Now playing the sine funtion");
+		playSine(fReq1, fReq2);
+		TimeUnit.SECONDS.sleep(time);
+		generateTrigger = false;
+		System.out.println("End playing");
 	}
 }

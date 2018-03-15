@@ -12,12 +12,14 @@ public class AcLink {
 		/* --------------------- */
 		
 		/* Project 1 Part 1 CK 2 */
-		Node1 node = new Node1();
-		node.recordPreSound("audio/ha02_06.wav", 10);
-		node.play();
+		// Node1 node = new Node1();
+		// node.recordPreSound("audio/ha02.wav", 10);
+		// node.play();
 		/* --------------------- */
 		
 		/* Project 1 Part 2 CK 1 */
+		 Node1 node = new Node1();
+		 node.playFunction(1000, 10000, 5);
 		/* --------------------- */
 		
 		/* Project 1 Part 3 CK 1 */
